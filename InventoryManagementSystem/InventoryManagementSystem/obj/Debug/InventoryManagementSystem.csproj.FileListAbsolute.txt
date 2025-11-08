@@ -1,0 +1,41 @@
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\bin\Debug\InventoryManagementSystem.exe.config
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\bin\Debug\InventoryManagementSystem.exe
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\bin\Debug\InventoryManagementSystem.pdb
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.csproj.AssemblyReference.cache
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.Form1.resources
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.Properties.Resources.resources
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.Registerform.resources
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.csproj.GenerateResource.cache
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.csproj.CoreCompileInputs.cache
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.exe
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.pdb
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.MainForm.resources
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.AdminDashboard.resources
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.AdminsDashboard.resources
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.AdminAddUsers.resources
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.AdminAddSuppliers.resources
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.AdminAddProducts.resources
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.CashierMainForm.resources
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.CashierOrder.resources
+C:\Users\monle\source\repos\InventoryManagementSystem\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.CashierCustomersForm.resources
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\bin\Debug\InventoryManagementSystem.exe.config
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\bin\Debug\InventoryManagementSystem.exe
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\bin\Debug\InventoryManagementSystem.pdb
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.csproj.AssemblyReference.cache
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.AdminAddProducts.resources
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.AdminAddSuppliers.resources
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.AdminAddUsers.resources
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.AdminsDashboard.resources
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.CashierCustomersForm.resources
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.CashierMainForm.resources
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.CashierOrder.resources
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.Form1.resources
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.MainForm.resources
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.Properties.Resources.resources
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.Registerform.resources
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.csproj.GenerateResource.cache
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.csproj.CoreCompileInputs.cache
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.exe
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.pdb
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.AdminAllSales.resources
+C:\Users\monle\source\repos\InventoryManagementSystem - Copy\InventoryManagementSystem\obj\Debug\InventoryManagementSystem.CashierDashboard.resources
