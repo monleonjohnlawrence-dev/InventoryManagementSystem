@@ -8,25 +8,25 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Data.SqlClient;
-using System.Data;
 
 namespace InventoryManagementSystem
 {
     public partial class AdminAddSuppliers : UserControl
     {
         SqlConnection connect = new SqlConnection(
-          @"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=C:\Users\monle\OneDrive\Documents\inventory.mdf;Integrated Security=True;Connect Timeout=30");
+          @"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=E:\InventoryManagementSystem\InventoryManagementSystem\DataBase\inventory.mdf;Integrated Security=True;Connect Timeout=30");
+
+        // ✅ Add this reference to call AdminAddProducts methods
+        public AdminAddProducts adminAddProducts;
 
         public AdminAddSuppliers()
         {
             InitializeComponent();
 
-            // ✅ Added: make sure grid updates and handles click when control loads
             this.Load += AdminAddSuppliers_Load;
             dataGridView1.CellClick += dataGridView1_CellClick;
         }
 
-        // ✅ Added: load event for initializing display
         private void AdminAddSuppliers_Load(object sender, EventArgs e)
         {
             displayAllSuppliers();
@@ -82,7 +82,10 @@ namespace InventoryManagementSystem
                                     MessageBox.Show("Supplier added successfully!", "Information Message", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                                     clearFields();
-                                    displayAllSuppliers(); // ✅ refresh
+                                    displayAllSuppliers(); // refresh grid
+
+                                    // ✅ Refresh the supplier dropdown in AdminAddProducts
+                                    adminAddProducts?.displaySuppliers();
                                 }
                             }
                         }
@@ -174,6 +177,9 @@ namespace InventoryManagementSystem
                         MessageBox.Show("Supplier updated successfully!", "Information Message", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         displayAllSuppliers();
                         clearFields();
+
+                        // ✅ Refresh the supplier dropdown in AdminAddProducts
+                        adminAddProducts?.displaySuppliers();
                     }
                     else
                     {
@@ -219,6 +225,9 @@ namespace InventoryManagementSystem
                             MessageBox.Show("Supplier removed successfully!", "Information Message", MessageBoxButtons.OK, MessageBoxIcon.Information);
                             displayAllSuppliers();
                             clearFields();
+
+                            // ✅ Refresh the supplier dropdown in AdminAddProducts
+                            adminAddProducts?.displaySuppliers();
                         }
                         else
                         {
@@ -255,6 +264,16 @@ namespace InventoryManagementSystem
         }
 
         private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+
+        }
+
+        private void panel1_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void AdminAddSuppliers_Load_1(object sender, EventArgs e)
         {
 
         }

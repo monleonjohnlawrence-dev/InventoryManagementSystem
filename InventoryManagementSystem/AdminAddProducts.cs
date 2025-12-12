@@ -15,7 +15,7 @@ namespace InventoryManagementSystem
     public partial class AdminAddProducts : UserControl
     {
         SqlConnection connect = new SqlConnection(
-            @"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=C:\Users\monle\OneDrive\Documents\inventory.mdf;Integrated Security=True;Connect Timeout=30");
+            @"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=E:\InventoryManagementSystem\InventoryManagementSystem\DataBase\inventory.mdf;Integrated Security=True;Connect Timeout=30");
 
         public AdminAddProducts()
         {
@@ -49,7 +49,7 @@ namespace InventoryManagementSystem
                 || AddProducts_imageView.Image == null);
         }
 
-       
+
         public void displaySuppliers()
         {
             if (checkConnection())
@@ -64,8 +64,10 @@ namespace InventoryManagementSystem
                         DataTable table = new DataTable();
                         adapter.Fill(table);
 
+                        AddProducts_supplier.DataSource = null; // clear old data
                         AddProducts_supplier.DataSource = table;
                         AddProducts_supplier.DisplayMember = "supplier_name";
+                        AddProducts_supplier.SelectedIndex = -1;
                     }
                 }
                 catch (Exception ex)
@@ -79,7 +81,11 @@ namespace InventoryManagementSystem
             }
         }
 
-       
+
+
+
+
+
         private void AddProducts_addBtn_Click(object sender, EventArgs e)
         {
             if (checkEmptyFields())

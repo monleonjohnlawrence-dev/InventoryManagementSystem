@@ -2,346 +2,643 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 using System.Data.SqlClient;
+using System.Drawing;
 using System.Drawing.Printing;
+using System.Windows.Forms;
 
 namespace InventoryManagementSystem
 {
     public partial class CashierOrder : UserControl
     {
+        private readonly string _connectionString =
+            @"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=E:\InventoryManagementSystem\InventoryManagementSystem\DataBase\inventory.mdf;Integrated Security=True;Connect Timeout=30";
+
+        // Receipt state after successful payment
+        private List<(string prodName, int qty, double unitPrice, double totalPrice)> lastTransactionItems
+            = new List<(string, int, double, double)>();
+
+        private double lastTransactionPaid = 0;
+        private double lastTransactionChange = 0;
+        private string lastCustomerId = "";
+
+        // Receipt formatting state
+        private int receiptY;
+        private readonly int receiptLeft = 20;
+        private readonly int receiptWidth = 260;
+
         public CashierOrder()
         {
             InitializeComponent();
+
+            if (IsInDesignMode())
+                return;
+
+            EnsureTransactionItemsTable();
             displayallAvailableProducts();
-
-            // ✅ handle clicks on DataGridView
-            DataGridView1.CellClick += DataGridView1_CellClick;
-
-            // ✅ display orders table in dataGridView2 on start
             DisplayAllOrders();
-            CalculateTotalPrice(); // ✅ added: show total on load
+            CalculateTotalPrice();
 
+            printDocument1.BeginPrint += printDocument1_BeginPrint;
+            printDocument1.PrintPage += printDocument1_PrintPage;
         }
 
-        public void displayallAvailableProducts()
+        private bool IsInDesignMode()
+        {
+            return LicenseManager.UsageMode == LicenseUsageMode.Designtime;
+        }
+
+        private void EnsureTransactionItemsTable()
         {
             try
             {
-                using (SqlConnection connect = new SqlConnection(
-                    @"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=C:\Users\monle\OneDrive\Documents\inventory.mdf;Integrated Security=True;Connect Timeout=30"))
+                using (SqlConnection conn = new SqlConnection(_connectionString))
                 {
-                    connect.Open();
+                    conn.Open();
+                    string sql = @"
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE name='transactionItems')
+BEGIN
+    CREATE TABLE transactionItems(
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        transaction_id INT NOT NULL,
+        prod_id INT NOT NULL,
+        prod_name VARCHAR(MAX),
+        qty INT,
+        orig_price DECIMAL(18,2),
+        total_price DECIMAL(18,2),
+        order_date DATETIME
+    );
+END";
+                    new SqlCommand(sql, conn).ExecuteNonQuery();
+                }
+            }
+            catch { }
+        }
 
-                    string query = "SELECT id, prod_name, price, stock FROM products WHERE status = 'Available'";
-                    SqlDataAdapter adapter = new SqlDataAdapter(query, connect);
+        // ---------------------------------------------------------------
+        // LOAD ALL PRODUCTS
+        // ---------------------------------------------------------------
+        public void displayallAvailableProducts()
+        {
+            if (IsInDesignMode()) return;
+
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(_connectionString))
+                {
+                    conn.Open();
+                    SqlDataAdapter adapter = new SqlDataAdapter(
+                        "SELECT id, prod_name, price, stock FROM products WHERE status='Available'", conn);
+
                     DataTable dt = new DataTable();
                     adapter.Fill(dt);
+                    DataGridView1.DataSource = dt;
 
-                    if (dt.Rows.Count > 0)
-                    {
-                        DataGridView1.DataSource = dt;
-
-                        DataGridView1.Columns["id"].HeaderText = "Product ID";
-                        DataGridView1.Columns["prod_name"].HeaderText = "Product Name";
-                        DataGridView1.Columns["price"].HeaderText = "Price (₱)";
+                    if (DataGridView1.Columns.Contains("price"))
                         DataGridView1.Columns["price"].DefaultCellStyle.Format = "₱ #,##0.00";
 
-                        DataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-                        DataGridView1.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-                        DataGridView1.ReadOnly = true;
-                    }
-                    else
-                    {
-                        MessageBox.Show("No available products found.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
+                    DataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                    DataGridView1.ReadOnly = true;
+                    DataGridView1.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error loading products: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Product Load Error: " + ex.Message);
             }
-        }
-
-        private void DataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
-        {
-            if (e.RowIndex >= 0)
-            {
-                DataGridViewRow row = DataGridView1.Rows[e.RowIndex];
-
-                cashierOrder_productID.Text = row.Cells["id"].Value.ToString();
-                label5cashierOrder_ProdName.Text = row.Cells["prod_name"].Value.ToString();
-                cashierOrder_price.Text = row.Cells["price"].Value.ToString();
-            }
-        }
-
-        private void comboBox1_SelectedIndexChanged(object sender, EventArgs e) { }
-        private void label6_Click(object sender, EventArgs e) { }
-        private void label8_Click(object sender, EventArgs e) { }
-        private void button2_Click(object sender, EventArgs e) { }
-        private void button3_Click(object sender, EventArgs e) { }
-        private void DataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e) { }
-        private void cashierOrder_productID_TextChanged(object sender, EventArgs e) { }
-        private void label5cashierOrder_ProdName_Click(object sender, EventArgs e) { }
-        private void cashierOrder_price_Click(object sender, EventArgs e) { }
-        private void panel2_Paint(object sender, PaintEventArgs e) { }
-        private void label3_Click(object sender, EventArgs e) { }
-        private void label4_Click(object sender, EventArgs e) { }
-        private void label7_Click(object sender, EventArgs e) { }
-        private void cashierOrder_qty_ValueChanged(object sender, EventArgs e) { }
-
-        private void cashierOrder_searchBox_TextChanged(object sender, EventArgs e)
-        {
-            SearchProducts();
         }
 
         private void SearchProducts()
         {
+            if (IsInDesignMode()) return;
+
             try
             {
-                using (SqlConnection connect = new SqlConnection(
-                    @"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=C:\Users\monle\OneDrive\Documents\inventory.mdf;Integrated Security=True;Connect Timeout=30"))
+                using (SqlConnection conn = new SqlConnection(_connectionString))
                 {
-                    connect.Open();
+                    conn.Open();
+                    SqlCommand cmd = new SqlCommand(
+@"SELECT id, prod_name, price FROM products 
+  WHERE status='Available' AND prod_name LIKE @s + '%'", conn);
 
-                    string search = cashierOrder_searchBox.Text.Trim();
+                    cmd.Parameters.AddWithValue("@s", cashierOrder_searchBox.Text.Trim());
 
-                    string query = @"SELECT id, prod_name, price 
-                                     FROM products 
-                                     WHERE status = 'Available' 
-                                     AND prod_name LIKE @search + '%'";
-
-                    SqlCommand cmd = new SqlCommand(query, connect);
-                    cmd.Parameters.AddWithValue("@search", search);
-
-                    SqlDataAdapter adapter = new SqlDataAdapter(cmd);
+                    SqlDataAdapter da = new SqlDataAdapter(cmd);
                     DataTable dt = new DataTable();
-                    adapter.Fill(dt);
+                    da.Fill(dt);
 
                     DataGridView1.DataSource = dt;
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error searching products: " + ex.Message);
+                MessageBox.Show("Search error: " + ex.Message);
             }
         }
 
+        private void DataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            cashierOrder_productID.Text =
+                DataGridView1.Rows[e.RowIndex].Cells["id"].Value.ToString();
+
+            label5cashierOrder_ProdName.Text =
+                DataGridView1.Rows[e.RowIndex].Cells["prod_name"].Value.ToString();
+
+            cashierOrder_price.Text =
+                DataGridView1.Rows[e.RowIndex].Cells["price"].Value.ToString();
+        }
+
+        private void cashierOrder_searchBox_TextChanged(object sender, EventArgs e)
+        {
+            SearchProducts();
+        }
+
+        // ---------------------------------------------------------------
+        // ADD ORDER  (fixed version)
+        // ---------------------------------------------------------------
         private void cashierOrder_addBtn_Click(object sender, EventArgs e)
         {
+            if (string.IsNullOrWhiteSpace(cashierOrder_productID.Text))
+            {
+                MessageBox.Show("Select a product first.");
+                return;
+            }
+
+            int qty = (int)cashierOrder_qty.Value;
+            if (qty <= 0)
+            {
+                MessageBox.Show("Quantity must be greater than zero.");
+                return;
+            }
+
+            if (!double.TryParse(cashierOrder_price.Text, out double price))
+            {
+                MessageBox.Show("Invalid price.");
+                return;
+            }
+
+            double total = qty * price;
+
             try
             {
-                if (string.IsNullOrEmpty(cashierOrder_productID.Text) ||
-                    string.IsNullOrEmpty(label5cashierOrder_ProdName.Text) ||
-                    string.IsNullOrEmpty(cashierOrder_price.Text))
+                using (SqlConnection conn = new SqlConnection(_connectionString))
                 {
-                    MessageBox.Show("Please select a product first.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                int qty = (int)cashierOrder_qty.Value;
-                if (qty <= 0)
-                {
-                    MessageBox.Show("Quantity must be greater than zero.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                double price = Convert.ToDouble(cashierOrder_price.Text);
-                double total = qty * price;
-
-                using (SqlConnection connect = new SqlConnection(
-                    @"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=C:\Users\monle\OneDrive\Documents\inventory.mdf;Integrated Security=True;Connect Timeout=30"))
-                {
-                    connect.Open();
-
-                    string stockQuery = "SELECT stock FROM products WHERE id = @id";
-                    SqlCommand checkStockCmd = new SqlCommand(stockQuery, connect);
-                    checkStockCmd.Parameters.AddWithValue("@id", cashierOrder_productID.Text);
-                    int currentStock = Convert.ToInt32(checkStockCmd.ExecuteScalar());
-
-                    if (qty > currentStock)
+                    conn.Open();
+                    using (SqlTransaction tran = conn.BeginTransaction())
                     {
-                        MessageBox.Show($"Not enough stock! Available: {currentStock}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
+                        // Check stock
+                        SqlCommand stockCmd = new SqlCommand(
+                            "SELECT stock FROM products WHERE id=@id", conn, tran);
+                        stockCmd.Parameters.AddWithValue("@id", cashierOrder_productID.Text);
+
+                        int stock = Convert.ToInt32(stockCmd.ExecuteScalar());
+                        if (qty > stock)
+                        {
+                            MessageBox.Show($"Not enough stock. Available: {stock}");
+                            tran.Rollback();
+                            return;
+                        }
+
+                        // Insert into orders
+                        SqlCommand insertCmd = new SqlCommand(
+@"INSERT INTO orders (prod_id, prod_name, qty, orig_price, total_price, order_date)
+  VALUES (@id, @name, @qty, @price, @total, @date)", conn, tran);
+
+                        insertCmd.Parameters.AddWithValue("@id", cashierOrder_productID.Text);
+                        insertCmd.Parameters.AddWithValue("@name", label5cashierOrder_ProdName.Text);
+                        insertCmd.Parameters.AddWithValue("@qty", qty);
+                        insertCmd.Parameters.AddWithValue("@price", price);
+                        insertCmd.Parameters.AddWithValue("@total", total);
+                        insertCmd.Parameters.AddWithValue("@date", DateTime.Now);
+                        insertCmd.ExecuteNonQuery();
+
+                        // Deduct stock
+                        SqlCommand updateCmd = new SqlCommand(
+                            "UPDATE products SET stock = stock - @q WHERE id=@id", conn, tran);
+                        updateCmd.Parameters.AddWithValue("@q", qty);
+                        updateCmd.Parameters.AddWithValue("@id", cashierOrder_productID.Text);
+                        updateCmd.ExecuteNonQuery();
+
+                        tran.Commit();
                     }
-
-                    string insertQuery = @"INSERT INTO orders (prod_id, prod_name, qty, orig_price, total_price, order_date)
-                                           VALUES (@prod_id, @prod_name, @qty, @orig_price, @total_price, @order_date)";
-
-                    SqlCommand insertCmd = new SqlCommand(insertQuery, connect);
-                    insertCmd.Parameters.AddWithValue("@prod_id", cashierOrder_productID.Text);
-                    insertCmd.Parameters.AddWithValue("@prod_name", label5cashierOrder_ProdName.Text);
-                    insertCmd.Parameters.AddWithValue("@qty", qty);
-                    insertCmd.Parameters.AddWithValue("@orig_price", price);
-                    insertCmd.Parameters.AddWithValue("@total_price", total);
-                    insertCmd.Parameters.AddWithValue("@order_date", DateTime.Now);
-                    insertCmd.ExecuteNonQuery();
-
-                    int newStock = currentStock - qty;
-                    string updateQuery = "UPDATE products SET stock = @newStock WHERE id = @id";
-                    SqlCommand updateCmd = new SqlCommand(updateQuery, connect);
-                    updateCmd.Parameters.AddWithValue("@newStock", newStock);
-                    updateCmd.Parameters.AddWithValue("@id", cashierOrder_productID.Text);
-                    updateCmd.ExecuteNonQuery();
-
-                    connect.Close();
                 }
-
-               
 
                 DisplayAllOrders();
                 displayallAvailableProducts();
-                CalculateTotalPrice(); // ✅ added: update total after adding
+
+                cashierOrder_qty.Value = 1;
+                cashierOrder_productID.Clear();
+                label5cashierOrder_ProdName.Text = "";
+                cashierOrder_price.Text = "0";
+
+                DataGridView1.ClearSelection();
+                dataGridView2.ClearSelection();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error adding order: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Add error: " + ex.Message);
             }
         }
-
+        // ---------------------------------------------------------------
+        // DISPLAY ORDERS & TOTAL
+        // ---------------------------------------------------------------
         private void DisplayAllOrders()
         {
             try
             {
-                using (SqlConnection connect = new SqlConnection(
-                    @"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=C:\Users\monle\OneDrive\Documents\inventory.mdf;Integrated Security=True;Connect Timeout=30"))
+                using (SqlConnection conn = new SqlConnection(_connectionString))
                 {
-                    connect.Open();
-
-                    string query = "SELECT id, prod_name, qty, orig_price, total_price, order_date FROM orders";
-                    SqlDataAdapter adapter = new SqlDataAdapter(query, connect);
+                    conn.Open();
+                    SqlDataAdapter adapter = new SqlDataAdapter("SELECT * FROM orders", conn);
                     DataTable dt = new DataTable();
                     adapter.Fill(dt);
 
                     dataGridView2.DataSource = dt;
-
-                    dataGridView2.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
                     dataGridView2.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
                     dataGridView2.ReadOnly = true;
+
+                    // HIDE COLUMNS SAFELY (Only if they exist)
+                    if (dataGridView2.Columns.Contains("id"))
+                        dataGridView2.Columns["id"].Visible = false;
+
+                    if (dataGridView2.Columns.Contains("customer_id"))
+                        dataGridView2.Columns["customer_id"].Visible = false;
+
+                    if (dataGridView2.Columns.Contains("order_date"))
+                        dataGridView2.Columns["order_date"].Visible = false;
                 }
 
-                CalculateTotalPrice(); // ✅ added: recalc after reload
+                CalculateTotalPrice();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error loading orders: " + ex.Message);
+                MessageBox.Show("Load orders error: " + ex.Message);
             }
         }
 
-        private void dataGridView2_CellContentClick(object sender, DataGridViewCellEventArgs e) { }
 
-        private void cashierOrder_totalPrice_Click(object sender, EventArgs e)
-        {
-            CalculateTotalPrice(); // ✅ just use your method here now
-        }
 
-        // ✅ Method to automatically calculate total
         private void CalculateTotalPrice()
         {
-            double totalSum = 0;
+            double total = 0;
 
             foreach (DataGridViewRow row in dataGridView2.Rows)
             {
-                if (row.Cells["total_price"].Value != null)
-                {
-                    string value = row.Cells["total_price"].Value.ToString();
-                    value = value.Replace("₱", "").Replace(",", "").Trim();
+                if (row.IsNewRow) continue;
 
-                    if (double.TryParse(value, out double price))
-                    {
-                        totalSum += price;
-                    }
-                }
+                if (double.TryParse(row.Cells["total_price"].Value?.ToString(), out double value))
+                    total += value;
             }
 
-            cashierOrder_totalPrice.Text = $"₱ {totalSum:N2}";
+            cashierOrder_totalPrice.Text = "₱ " + total.ToString("N2");
         }
 
+        // ---------------------------------------------------------------
+        // REMOVE ORDER (Fully Fixed)
+        // ---------------------------------------------------------------
         private void cashierOrder_removeBtn_Click(object sender, EventArgs e)
         {
             if (dataGridView2.SelectedRows.Count == 0)
             {
-                return; // just exit silently if nothing is selected
+                MessageBox.Show("Select an order to remove.");
+                return;
             }
+
+            DataGridViewRow row = dataGridView2.SelectedRows[0];
+
+            int orderId = Convert.ToInt32(row.Cells["id"].Value);
+            int qty = Convert.ToInt32(row.Cells["qty"].Value);
+            int prodID = Convert.ToInt32(row.Cells["prod_id"].Value);
 
             try
             {
-                int orderId = Convert.ToInt32(dataGridView2.SelectedRows[0].Cells["id"].Value);
-
-                using (SqlConnection connect = new SqlConnection(
-                    @"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=C:\Users\monle\OneDrive\Documents\inventory.mdf;Integrated Security=True;Connect Timeout=30"))
+                using (SqlConnection conn = new SqlConnection(_connectionString))
                 {
-                    connect.Open();
-                    string deleteQuery = "DELETE FROM orders WHERE id = @id";
-                    SqlCommand cmd = new SqlCommand(deleteQuery, connect);
-                    cmd.Parameters.AddWithValue("@id", orderId);
-                    cmd.ExecuteNonQuery();
-                    connect.Close();
+                    conn.Open();
+
+                    using (SqlTransaction tran = conn.BeginTransaction())
+                    {
+                        // Restore stock
+                        SqlCommand stockCmd = new SqlCommand(
+                            "UPDATE products SET stock = stock + @q WHERE id=@id", conn, tran);
+                        stockCmd.Parameters.AddWithValue("@q", qty);
+                        stockCmd.Parameters.AddWithValue("@id", prodID);
+                        stockCmd.ExecuteNonQuery();
+
+                        // Delete the order
+                        SqlCommand deleteCmd = new SqlCommand(
+                            "DELETE FROM orders WHERE id=@id", conn, tran);
+                        deleteCmd.Parameters.AddWithValue("@id", orderId);
+                        deleteCmd.ExecuteNonQuery();
+
+                        tran.Commit();
+                    }
                 }
 
-                // Refresh the data and recalc totals immediately
                 DisplayAllOrders();
-                CalculateTotalPrice();
+                displayallAvailableProducts();
+
+                MessageBox.Show("Order removed successfully.");
             }
-            catch
+            catch (Exception ex)
             {
-                // silently ignore errors (optional: log them if needed)
+                MessageBox.Show("Remove error: " + ex.Message);
             }
         }
 
+        // ---------------------------------------------------------------
+        // CLEAR ALL ORDERS (RESTORE STOCK)
+        // ---------------------------------------------------------------
         private void cashierOrder_clearBtn_Click(object sender, EventArgs e)
         {
             try
             {
-                using (SqlConnection connect = new SqlConnection(
-                    @"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=C:\Users\monle\OneDrive\Documents\inventory.mdf;Integrated Security=True;Connect Timeout=30"))
+                using (SqlConnection conn = new SqlConnection(_connectionString))
                 {
-                    connect.Open();
-                    string deleteQuery = "DELETE FROM orders";
-                    SqlCommand cmd = new SqlCommand(deleteQuery, connect);
-                    cmd.ExecuteNonQuery();
-                    connect.Close();
+                    conn.Open();
+
+                    using (SqlTransaction tran = conn.BeginTransaction())
+                    {
+                        SqlCommand restoreCmd = new SqlCommand(@"
+UPDATE products SET stock = stock + o.qty
+FROM products p
+INNER JOIN orders o ON p.id = o.prod_id;", conn, tran);
+                        restoreCmd.ExecuteNonQuery();
+
+                        SqlCommand clearCmd = new SqlCommand(
+                            "DELETE FROM orders", conn, tran);
+                        clearCmd.ExecuteNonQuery();
+
+                        tran.Commit();
+                    }
                 }
 
-                // Refresh data and recalc totals immediately
                 DisplayAllOrders();
-                CalculateTotalPrice();
+                displayallAvailableProducts();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error clearing orders: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Clear error: " + ex.Message);
             }
         }
 
+        // ---------------------------------------------------------------
+        // PAYMENT PROCESS  (Fully Fixed)
+        // ---------------------------------------------------------------
+        private void cashierOrder_payOrders_Click(object sender, EventArgs e)
+        {
+            if (dataGridView2.Rows.Count == 0)
+            {
+                MessageBox.Show("There are no orders to pay.");
+                return;
+            }
 
-        private void label10_Click(object sender, EventArgs e) { }
+            if (!double.TryParse(cashierOrder_totalPrice.Text.Replace("₱", "").Trim(), out double totalAmount))
+            {
+                MessageBox.Show("Invalid total amount.");
+                return;
+            }
 
+            if (!double.TryParse(cashierOrder_ammount.Text.Trim(), out double cashPaid))
+            {
+                MessageBox.Show("Invalid cash amount.");
+                return;
+            }
+
+            if (cashPaid < totalAmount)
+            {
+                MessageBox.Show("Insufficient cash.");
+                return;
+            }
+
+            double changeAmount = cashPaid - totalAmount;
+
+            // Load current orders
+            var orderItems = new List<(int prod_id, string prod_name, int qty, double orig_price, double total_price, DateTime order_date)>();
+
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+                SqlCommand cmd = new SqlCommand(
+                    "SELECT prod_id, prod_name, qty, orig_price, total_price, order_date FROM orders", conn);
+
+                SqlDataReader r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    orderItems.Add((
+                        Convert.ToInt32(r["prod_id"]),
+                        r["prod_name"].ToString(),
+                        Convert.ToInt32(r["qty"]),
+                        Convert.ToDouble(r["orig_price"]),
+                        Convert.ToDouble(r["total_price"]),
+                        Convert.ToDateTime(r["order_date"])
+                    ));
+                }
+            }
+
+            if (orderItems.Count == 0)
+            {
+                MessageBox.Show("No orders to process.");
+                return;
+            }
+
+            string customerId = DateTime.Now.ToString("yyyyMMddHHmmss");
+            int insertedTransId = -1;
+
+            // Save transaction
+            using (SqlConnection conn = new SqlConnection(_connectionString))
+            {
+                conn.Open();
+
+                using (SqlTransaction tran = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        // Insert transaction header
+                        SqlCommand insertTrans = new SqlCommand(@"
+INSERT INTO transactionData (customer_id, total_amount, cash_paid, change_amount, transaction_date)
+VALUES (@cid, @t, @cash, @chg, @date);
+SELECT CAST(SCOPE_IDENTITY() AS INT);", conn, tran);
+
+                        insertTrans.Parameters.AddWithValue("@cid", customerId);
+                        insertTrans.Parameters.AddWithValue("@t", totalAmount);
+                        insertTrans.Parameters.AddWithValue("@cash", cashPaid);
+                        insertTrans.Parameters.AddWithValue("@chg", changeAmount);
+                        insertTrans.Parameters.AddWithValue("@date", DateTime.Now);
+
+                        insertedTransId = Convert.ToInt32(insertTrans.ExecuteScalar());
+
+                        // Insert each item
+                        foreach (var it in orderItems)
+                        {
+                            SqlCommand itemCmd = new SqlCommand(@"
+INSERT INTO transactionItems (transaction_id, prod_id, prod_name, qty, orig_price, total_price, order_date)
+VALUES (@tid, @pid, @pname, @qty, @op, @tp, @date)", conn, tran);
+
+                            itemCmd.Parameters.AddWithValue("@tid", insertedTransId);
+                            itemCmd.Parameters.AddWithValue("@pid", it.prod_id);
+                            itemCmd.Parameters.AddWithValue("@pname", it.prod_name);
+                            itemCmd.Parameters.AddWithValue("@qty", it.qty);
+                            itemCmd.Parameters.AddWithValue("@op", it.orig_price);
+                            itemCmd.Parameters.AddWithValue("@tp", it.total_price);
+                            itemCmd.Parameters.AddWithValue("@date", it.order_date);
+
+                            itemCmd.ExecuteNonQuery();
+                        }
+
+                        // Clear order table
+                        new SqlCommand("DELETE FROM orders", conn, tran).ExecuteNonQuery();
+
+                        tran.Commit();
+                    }
+                    catch (Exception ex)
+                    {
+                        tran.Rollback();
+                        MessageBox.Show("Transaction failed: " + ex.Message);
+                        return;
+                    }
+                }
+            }
+
+            // Store latest transaction for printing
+            lastTransactionItems.Clear();
+            lastCustomerId = customerId;
+            lastTransactionPaid = cashPaid;
+            lastTransactionChange = changeAmount;
+
+            foreach (var it in orderItems)
+                lastTransactionItems.Add((it.prod_name, it.qty, it.orig_price, it.total_price));
+
+            DisplayAllOrders();
+            displayallAvailableProducts();
+
+            MessageBox.Show($"Payment successful! Change: ₱ {changeAmount:N2}");
+            printPreviewDialog1.Document = printDocument1;
+            printPreviewDialog1.ShowDialog();
+        }
+        // -------------------------------------------------------------------
+        // PRINTING / RECEIPT  (Fully Fixed: Clean formatting + no duplicate print)
+        // -------------------------------------------------------------------
+        public void PrintAllOrders()
+        {
+            if (lastTransactionItems.Count == 0)
+            {
+                MessageBox.Show("No recent transaction to print.");
+                return;
+            }
+
+            printPreviewDialog1.Document = printDocument1;
+            printPreviewDialog1.ShowDialog();
+        }
+
+        private void printDocument1_BeginPrint(object sender, PrintEventArgs e)
+        {
+            receiptY = 20;
+            
+        }
+
+        private void printDocument1_PrintPage(object sender, PrintPageEventArgs e)
+        {
+            Font titleFont = new Font("Arial", 16, FontStyle.Bold);
+            Font headerFont = new Font("Arial", 12, FontStyle.Bold);
+            Font bodyFont = new Font("Arial", 10);
+            Font boldFont = new Font("Arial", 10, FontStyle.Bold);
+
+            int x = receiptLeft;
+            int y = receiptY;
+
+            // HEADER
+            e.Graphics.DrawString("INVENTORY SYSTEM", titleFont, Brushes.Black, x, y);
+            y += 28;
+            e.Graphics.DrawString("Receipt", headerFont, Brushes.Black, x, y);
+            y += 22;
+
+            e.Graphics.DrawString("Customer ID: " + lastCustomerId, bodyFont, Brushes.Black, x, y);
+            y += 18;
+
+            e.Graphics.DrawString("Date: " + DateTime.Now.ToString("MMM dd, yyyy hh:mm tt"),
+                bodyFont, Brushes.Black, x, y);
+            y += 18;
+
+            e.Graphics.DrawLine(Pens.Black, x, y, x + receiptWidth, y);
+            y += 8;
+
+            // COLUMN HEADERS
+            e.Graphics.DrawString("Product", boldFont, Brushes.Black, x, y);
+            e.Graphics.DrawString("Qty", boldFont, Brushes.Black, x + 130, y);
+            e.Graphics.DrawString("Total", boldFont, Brushes.Black, x + 185, y);
+            y += 18;
+
+            e.Graphics.DrawLine(Pens.Black, x, y, x + receiptWidth, y);
+            y += 8;
+
+            // ITEMS
+            double grandTotal = 0;
+
+            foreach (var item in lastTransactionItems)
+            {
+                string prod = item.prodName.Length > 15 ? item.prodName.Substring(0, 15) : item.prodName;
+
+                e.Graphics.DrawString(prod, bodyFont, Brushes.Black, x, y);
+                e.Graphics.DrawString(item.qty.ToString(), bodyFont, Brushes.Black, x + 130, y);
+                e.Graphics.DrawString(item.totalPrice.ToString("N2"), bodyFont, Brushes.Black, x + 185, y);
+
+                y += 18;
+                grandTotal += item.totalPrice;
+
+                // HANDLE NEW PAGE
+                if (y > e.MarginBounds.Bottom - 60)
+                {
+                    e.HasMorePages = true;
+                    receiptY = 20;
+                    return;
+                }
+            }
+
+            // TOTAL LINE
+            y += 6;
+            e.Graphics.DrawLine(Pens.Black, x, y, x + receiptWidth, y);
+            y += 10;
+
+            e.Graphics.DrawString("TOTAL:", boldFont, Brushes.Black, x, y);
+            e.Graphics.DrawString("₱ " + grandTotal.ToString("N2"), boldFont, Brushes.Black, x + 140, y);
+            y += 22;
+
+            e.Graphics.DrawString("Amount Paid: ₱ " + lastTransactionPaid.ToString("N2"), bodyFont, Brushes.Black, x, y);
+            y += 18;
+
+            e.Graphics.DrawString("Change: ₱ " + lastTransactionChange.ToString("N2"), bodyFont, Brushes.Black, x, y);
+            y += 22;
+
+            e.Graphics.DrawLine(Pens.Black, x, y, x + receiptWidth, y);
+            y += 12;
+
+            // FOOTER
+            e.Graphics.DrawString("Thank you for shopping!", bodyFont, Brushes.Black, x, y);
+            y += 16;
+            e.Graphics.DrawString("Please come again.", bodyFont, Brushes.Black, x, y);
+
+            // Final page
+            e.HasMorePages = false;
+        }
+
+        // -------------------------------------------------------------------
+        // UI HELPER FUNCTIONS
+        // -------------------------------------------------------------------
         private void cashierOrder_ammount_TextChanged(object sender, EventArgs e)
         {
-            // Auto calculate change whenever amount changes
             try
             {
-                string totalText = cashierOrder_totalPrice.Text.Replace("₱", "").Replace(",", "").Trim();
-                double total = 0, amount = 0;
+                double total = 0;
+                if (double.TryParse(cashierOrder_totalPrice.Text.Replace("₱", "").Trim(), out double t))
+                    total = t;
 
-                double.TryParse(totalText, out total);
-                double.TryParse(cashierOrder_ammount.Text, out amount);
-
+                double amount = double.TryParse(cashierOrder_ammount.Text.Trim(), out double a) ? a : 0;
                 double change = amount - total;
 
-                // Only show change if amount >= total
-                if (amount >= total)
-                {
-                    cashierOrder_change.Text = $"₱ {change:N2}";
-                }
-                else
-                {
-                    cashierOrder_change.Text = "₱ 0.00";
-                }
+                cashierOrder_change.Text = "₱ " + (change >= 0 ? change.ToString("N2") : "0.00");
             }
             catch
             {
@@ -351,219 +648,58 @@ namespace InventoryManagementSystem
 
         private void cashierOrder_change_Click(object sender, EventArgs e)
         {
-            try
-            {
-                string totalText = cashierOrder_totalPrice.Text.Replace("₱", "").Replace(",", "").Trim();
-                double total = 0, amount = 0;
-
-                double.TryParse(totalText, out total);
-                double.TryParse(cashierOrder_ammount.Text, out amount);
-
-                double change = amount - total;
-
-                if (change < 0)
-                {
-                    MessageBox.Show("Insufficient payment!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-                else
-                {
-                    cashierOrder_change.Text = $"₱ {change:N2}";
-                    MessageBox.Show($"Change: ₱ {change:N2}", "Payment Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-            }
-            catch
-            {
-                MessageBox.Show("Invalid input!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            MessageBox.Show("Change: " + cashierOrder_change.Text);
         }
 
-        private void cashierOrder_payOrders_Click(object sender, EventArgs e)
+        private void cashierOrder_qty_ValueChanged(object sender, EventArgs e)
         {
-            try
+            // Optional logic if needed later
+        }
+
+        private void cashierOrder_discountBtn_Click(object sender, EventArgs e)
+        {
+            // Ask confirmation
+            DialogResult result = MessageBox.Show(
+                "Apply 20% discount to the total price?",
+                "Confirm Discount",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question
+            );
+
+            if (result == DialogResult.No)
             {
-                double totalAmount = 0;
-                double amountPaid = 0;
-                double change = 0;
-
-                string totalText = cashierOrder_totalPrice.Text.Replace("₱", "").Replace(",", "").Trim();
-                double.TryParse(totalText, out totalAmount);
-                double.TryParse(cashierOrder_ammount.Text, out amountPaid);
-
-                change = amountPaid - totalAmount;
-
-                if (amountPaid < totalAmount)
-                {
-                    MessageBox.Show("Not enough payment!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-
-                // ✅ Declare outside so it can be used later
-                string customerId = Guid.NewGuid().ToString().Substring(0, 8);
-
-                using (SqlConnection connect = new SqlConnection(
-                    @"Data Source=(LocalDB)\MSSQLLocalDB;AttachDbFilename=C:\Users\monle\OneDrive\Documents\inventory.mdf;Integrated Security=True;Connect Timeout=30"))
-                {
-                    connect.Open();
-
-                    string insertCustomer = @"INSERT INTO customers 
-            (customer_id, total_price, amount, change_amount, order_date)
-            VALUES (@customer_id, @total_price, @amount, @change_amount, @order_date)";
-
-                    SqlCommand insertCmd = new SqlCommand(insertCustomer, connect);
-                    insertCmd.Parameters.AddWithValue("@customer_id", customerId);
-                    insertCmd.Parameters.AddWithValue("@total_price", totalAmount);
-                    insertCmd.Parameters.AddWithValue("@amount", amountPaid);
-                    insertCmd.Parameters.AddWithValue("@change_amount", change);
-                    insertCmd.Parameters.AddWithValue("@order_date", DateTime.Now);
-                    insertCmd.ExecuteNonQuery();
-
-                    connect.Close();
-                }
-
-                // ✅ Now these can use customerId
-                cashierOrder_change.Text = $"₱ {change:N2}";
-                MessageBox.Show($"Payment successful!\nCustomer ID: {customerId}\nChange: ₱ {change:N2}", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return; // Cancel discount
             }
-            catch (Exception ex)
+
+            // Convert displayed total price
+            if (!double.TryParse(cashierOrder_totalPrice.Text.Replace("₱", "").Trim(), out double currentTotal))
             {
-                MessageBox.Show("Error processing payment: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Invalid total amount.");
+                return;
             }
+
+            // Calculate 20% discount
+            double discountAmount = currentTotal * 0.20;
+            double newTotal = currentTotal - discountAmount;
+
+            // Update the total price label
+            cashierOrder_totalPrice.Text = "₱ " + newTotal.ToString("N2");
+
+            // Update label8 text
+            label8.Text = "DISCOUNTED!";
+
+            MessageBox.Show("20% discount successfully applied!", "Success",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
 
-        private int rowIndex = 0;
-
-        private void cashierOrder_receipt_Click(object sender, EventArgs e)
+        private void label8_Click(object sender, EventArgs e)
         {
-            // Prevent duplicate handlers
-            printDocument1.PrintPage -= new PrintPageEventHandler(printDocument1_PrintPage);
-            printDocument1.PrintPage += new PrintPageEventHandler(printDocument1_PrintPage);
 
-            printDocument1.BeginPrint -= new PrintEventHandler(printDocument1_BeginPrint);
-            printDocument1.BeginPrint += new PrintEventHandler(printDocument1_BeginPrint);
-
-            // Show print preview
-            printPreviewDialog1.Document = printDocument1;
-            printPreviewDialog1.ShowDialog();
         }
 
-        private void printDocument1_BeginPrint(object sender, System.Drawing.Printing.PrintEventArgs e)
+        private void dataGridView2_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
-            rowIndex = 0;
-        }
-
-        private void printDocument1_PrintPage(object sender, System.Drawing.Printing.PrintPageEventArgs e)
-        {
-            // ✅ Calculate total from DataGridView
-            double totalPrice = 0;
-            foreach (DataGridViewRow row in dataGridView2.Rows)
-            {
-                if (row.Cells["total_price"].Value != null &&
-                    double.TryParse(row.Cells["total_price"].Value.ToString(), out double val))
-                {
-                    totalPrice += val;
-                }
-            }
-
-            // ----- Variables -----
-            float y = 0;
-            int colWidth = 120;
-            int headerMargin = 10;
-            int tableMargin = 20;
-
-            Font font = new Font("Arial", 12);
-            Font bold = new Font("Arial", 12, FontStyle.Bold);
-            Font headerFont = new Font("Arial", 16, FontStyle.Bold);
-            Font labelFont = new Font("Arial", 14, FontStyle.Bold);
-
-            float margin = e.MarginBounds.Top;
-
-            StringFormat alignCenter = new StringFormat
-            {
-                Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Center
-            };
-
-            // ----- Header -----
-            string headerText = "STORE RECEIPT";
-            y = margin + headerMargin;
-            e.Graphics.DrawString(headerText, headerFont, Brushes.Black,
-                e.MarginBounds.Left + (e.MarginBounds.Width / 2), y, alignCenter);
-            y += headerFont.GetHeight(e.Graphics) + 30;
-
-            // ----- Table Header -----
-            string[] header = { "Product Name", "Qty", "Price", "Total" };
-            for (int q = 0; q < header.Length; q++)
-            {
-                e.Graphics.DrawString(header[q], bold, Brushes.Black,
-                    e.MarginBounds.Left + q * colWidth, y, alignCenter);
-            }
-            y += bold.GetHeight(e.Graphics) + 10;
-
-            // Draw line under table header
-            e.Graphics.DrawLine(Pens.Black, e.MarginBounds.Left, y, e.MarginBounds.Left + (colWidth * header.Length), y);
-            y += 10;
-
-            // ----- Table Body -----
-            while (rowIndex < dataGridView2.Rows.Count)
-            {
-                DataGridViewRow row = dataGridView2.Rows[rowIndex];
-
-                // measure height needed for this row
-                float rowHeight = font.GetHeight(e.Graphics);
-                for (int q = 0; q < dataGridView2.Columns.Count && q < header.Length; q++)
-                {
-                    object cellValue = row.Cells[q].Value;
-                    string cell = (cellValue != null) ? cellValue.ToString() : string.Empty;
-
-                    SizeF sz = e.Graphics.MeasureString(cell, font, colWidth);
-                    if (sz.Height > rowHeight) rowHeight = sz.Height;
-                }
-
-                // draw cells for this row
-                for (int q = 0; q < dataGridView2.Columns.Count && q < header.Length; q++)
-                {
-                    object cellValue = row.Cells[q].Value;
-                    string cell = (cellValue != null) ? cellValue.ToString() : string.Empty;
-
-                    e.Graphics.DrawString(cell, font, Brushes.Black,
-                        e.MarginBounds.Left + q * colWidth, y, new StringFormat(StringFormatFlags.LineLimit));
-                }
-
-                y += rowHeight + 5f; // move down
-                rowIndex++;
-
-                // check if we need a new page
-                if (y + font.GetHeight(e.Graphics) > e.MarginBounds.Bottom - 150)
-                {
-                    e.HasMorePages = true;
-                    return;
-                }
-            } // <-- end of product loop
-
-            // ✅ Totals start after last row
-            y += 20;
-            e.Graphics.DrawLine(Pens.Black, e.MarginBounds.Left, y, e.MarginBounds.Left + (colWidth * header.Length), y);
-            y += 25;
-
-            double amountPaid = 0, change = 0;
-            double.TryParse(cashierOrder_ammount.Text, out amountPaid);
-            string changeText = cashierOrder_change.Text.Replace("₱", "").Replace(",", "").Trim();
-            double.TryParse(changeText, out change);
-
-            e.Graphics.DrawString($"Total Price: ₱ {totalPrice:N2}", labelFont, Brushes.Black, e.MarginBounds.Left, y);
-            y += 30;
-            e.Graphics.DrawString($"Amount: ₱ {amountPaid:N2}", labelFont, Brushes.Black, e.MarginBounds.Left, y);
-            y += 30;
-            e.Graphics.DrawString($"Change: ₱ {change:N2}", labelFont, Brushes.Black, e.MarginBounds.Left, y);
-            y += 40;
-
-            e.Graphics.DrawString(DateTime.Now.ToString("MMM dd, yyyy hh:mm tt"), font, Brushes.Black, e.MarginBounds.Left, y);
-            y += 25;
-            e.Graphics.DrawString("Thank you for shopping with us!", bold, Brushes.Black, e.MarginBounds.Left, y);
-
-
-
 
         }
     }

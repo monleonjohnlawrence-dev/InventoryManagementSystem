@@ -40,9 +40,10 @@
             // 
             // panel1
             // 
+            this.panel1.BackColor = System.Drawing.Color.White;
             this.panel1.Controls.Add(this.label1);
             this.panel1.Controls.Add(this.tday_Sales);
-            this.panel1.Location = new System.Drawing.Point(316, 17);
+            this.panel1.Location = new System.Drawing.Point(305, 63);
             this.panel1.Name = "panel1";
             this.panel1.Size = new System.Drawing.Size(454, 209);
             this.panel1.TabIndex = 0;
@@ -51,6 +52,7 @@
             // 
             this.label1.AutoSize = true;
             this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 27.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label1.ForeColor = System.Drawing.Color.Black;
             this.label1.Location = new System.Drawing.Point(81, 13);
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(294, 42);
@@ -61,6 +63,7 @@
             // 
             this.tday_Sales.AutoSize = true;
             this.tday_Sales.Font = new System.Drawing.Font("Microsoft Sans Serif", 20.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.tday_Sales.ForeColor = System.Drawing.Color.Black;
             this.tday_Sales.Location = new System.Drawing.Point(188, 114);
             this.tday_Sales.Name = "tday_Sales";
             this.tday_Sales.Size = new System.Drawing.Size(71, 31);
@@ -79,6 +82,7 @@
             // dataGridView1
             // 
             this.dataGridView1.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
+            this.dataGridView1.BackgroundColor = System.Drawing.Color.Black;
             this.dataGridView1.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.dataGridView1.Location = new System.Drawing.Point(3, 3);
             this.dataGridView1.Name = "dataGridView1";
@@ -91,6 +95,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.Color.White;
             this.Controls.Add(this.panel2);
             this.Controls.Add(this.panel1);
             this.Name = "CashierDashboard";
